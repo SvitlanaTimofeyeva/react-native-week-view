@@ -10,8 +10,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     width: 60,
-    borderColor: '#fff',
-    borderTopWidth: 1,
   },
   columns: {
     flex: 1,
@@ -21,9 +19,6 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    borderColor: '#fff',
-    borderTopWidth: 1,
-    borderLeftWidth: 1,
   },
   text: {
     color: '#fff',
