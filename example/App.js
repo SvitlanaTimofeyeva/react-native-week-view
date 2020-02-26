@@ -1,84 +1,177 @@
-/**
- * Sample React Native App
- * https://github.com/facebook/react-native
- * @format
- */
-
 import React, { Component } from 'react';
+import PropTypes from 'prop-types';
 import {
-  StyleSheet,
   View,
-  Alert,
+  ScrollView,
+  Dimensions,
+  Text,
 } from 'react-native';
-import WeekView, { addLocale } from 'react-native-week-view';
+import moment from 'moment';
+import { setLocale } from '../utils';
+import Events from '../Events/Events';
+import Header from '../Header/Header';
+import styles from './WeekView.styles';
 
-addLocale('fr', {
-  months: 'janvier_février_mars_avril_mai_juin_juillet_août_septembre_octobre_novembre_décembre'.split('_'),
-  monthsShort: 'janv._févr._mars_avr._mai_juin_juil._août_sept._oct._nov._déc.'.split('_'),
-  weekdays: 'dimanche_lundi_mardi_mercredi_jeudi_vendredi_samedi'.split('_'),
-  weekdaysShort: 'dim._lun._mar._mer._jeu._ven._sam.'.split('_'),
-});
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
+const TIME_LABELS_COUNT = 12;
 
-export default class App extends Component {
-  selectedDate = new Date();
+export default class WeekView extends Component {
+  constructor(props) {
+    super(props);
+    this.state = {
+      currentMoment: props.selectedDate,
+    };
+    this.calendar = null;
+    setLocale(props.locale);
+    this.times = this.generateTimes();
+  }
 
-  generateDates = (hours, minutes) => {
-    const date = new Date();
-    date.setHours(date.getHours() + hours);
-    if (minutes != null) {
-      date.setMinutes(minutes);
+  componentDidMount() {
+    requestAnimationFrame(() => {
+      this.calendar.scrollTo({ y: 0, x: 2 * (SCREEN_WIDTH - 60), animated: false });
+    });
+  }
+
+  componentWillReceiveProps(nextProps) {
+    if (nextProps.selectedDate) {
+      this.setState({ currentMoment: nextProps.selectedDate });
     }
-    return date;
+    if (nextProps.locale !== this.props.locale) {
+      setLocale(nextProps.locale);
+    }
+  }
+
+  componentDidUpdate() {
+    this.calendar.scrollTo({ y: 0, x: 2 * (SCREEN_WIDTH - 60), animated: false });
+  }
+
+  generateTimes = () => {
+    const times = [
+      '22:00',
+      '20:00',
+      '18:00',
+      '16:00',
+      '14:00',
+      '12:00',
+      '10:00',
+      '8:00'
+    ];
+    // for (let i = 0; i < TIME_LABELS_COUNT; i += 1) {
+    //   const minutes = i % 2 === 0 ? '00' : '00';
+    //   const hour = i;
+    //   const time = `${hour}:${minutes}`;
+    //   times.push(time);
+    // }
+    return times;
+  };
+
+  scrollEnded = (event) => {
+    const { nativeEvent: { contentOffset, contentSize } } = event;
+    const { x: position } = contentOffset;
+    const { width: innerWidth } = contentSize;
+    const newPage = (position / innerWidth) * 5;
+    const { onSwipePrev, onSwipeNext, numberOfDays } = this.props;
+    const { currentMoment } = this.state;
+    requestAnimationFrame(() => {
+      const newMoment = moment(currentMoment)
+        .add((newPage - 2) * numberOfDays, 'd')
+        .toDate();
+
+      this.setState({ currentMoment: newMoment });
+
+      if (newPage < 2) {
+        onSwipePrev && onSwipePrev(newMoment);
+      } else if (newPage > 2) {
+        onSwipeNext && onSwipeNext(newMoment);
+      }
+    });
+  };
+
+  scrollViewRef = (ref) => {
+    this.calendar = ref;
+  }
+
+  prepareDates = (currentMoment, numberOfDays) => {
+    const dates = [];
+    for (let i = -2; i < 3; i += 1) {
+      const date = moment(currentMoment).add(numberOfDays * i, 'd');
+      dates.push(date);
+    }
+    return dates;
   };
 
   render() {
-    const events = [
-      {
-        id: 1,
-        description: 'Event 1',
-        startDate: this.generateDates(0),
-        endDate: this.generateDates(2),
-        color: 'blue',
-      },
-      {
-        id: 2,
-        description: 'Event 2',
-        startDate: this.generateDates(1),
-        endDate: this.generateDates(4),
-        color: 'red',
-      },
-      {
-        id: 3,
-        description: 'Event 3',
-        startDate: this.generateDates(-5),
-        endDate: this.generateDates(-3),
-        color: 'green',
-      },
-    ];
-
+    const {
+      numberOfDays,
+      headerStyle,
+      formatDateHeader,
+      onEventPress,
+      events,
+    } = this.props;
+    const { currentMoment } = this.state;
+    const dates = this.prepareDates(currentMoment, numberOfDays);
     return (
       <View style={styles.container}>
-        <WeekView
-          events={events}
-          selectedDate={this.selectedDate}
-          numberOfDays={3}
-          onEventPress={(event) => Alert.alert('eventId:' + event.id)}
-          headerStyle={styles.headerStyle}
-          formatDateHeader="MMM D"
-          locale="fr"
-        />
+        <ScrollView>
+          <View style={styles.scrollViewContent}>
+            <View style={styles.timeColumn}>
+              {this.times.map(time => (
+                <View key={time} style={styles.timeLabel}>
+                  <Text style={styles.timeText}>{time}</Text>
+                </View>
+              ))}
+            </View>
+            <ScrollView
+              horizontal
+              pagingEnabled
+              automaticallyAdjustContentInsets={false}
+              onMomentumScrollEnd={this.scrollEnded}
+              ref={this.scrollViewRef}
+            >
+              {dates.map(date => (
+                <View
+                  key={date}
+                  style={{ flex: 1, width: SCREEN_WIDTH - 60 }}
+                >
+                  <Events
+                    key={dates}
+                    times={this.times}
+                    selectedDate={date.toDate()}
+                    numberOfDays={numberOfDays}
+                    onEventPress={onEventPress}
+                    events={events}
+                  />
+                </View>
+              ))}
+            </ScrollView>
+          </View>
+        </ScrollView>
+        <View style={styles.header}>
+          <Header
+            style={headerStyle}
+            formatDate={formatDateHeader}
+            selectedDate={currentMoment}
+            numberOfDays={numberOfDays}
+          />
+        </View>
       </View>
     );
   }
 }
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#FFF',
-    paddingTop: 22,
-  },
-  headerStyle: {
-    backgroundColor: '#4286f4',
-  },
-});
+WeekView.propTypes = {
+  events: Events.propTypes.events,
+  numberOfDays: PropTypes.oneOf([1, 3, 7]).isRequired,
+  onSwipeNext: PropTypes.func,
+  onSwipePrev: PropTypes.func,
+  formatDateHeader: PropTypes.string,
+  onEventPress: PropTypes.func,
+  headerStyle: PropTypes.object,
+  selectedDate: PropTypes.instanceOf(Date).isRequired,
+  locale: PropTypes.string,
+};
+
+WeekView.defaultProps = {
+  events: [],
+  locale: 'en',
+};
